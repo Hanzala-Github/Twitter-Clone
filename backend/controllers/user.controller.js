@@ -1,5 +1,6 @@
 import { v2 as cloudinary } from "cloudinary";
 import bcrypt from "bcryptjs";
+import mongoose from "mongoose";
 //...... models imports
 import { User } from "../models/user.model.js";
 import { Notification } from "../models/notification.model.js";
@@ -14,68 +15,84 @@ const getUserProfile = async (req, res) => {
       return res.status(400).json({ error: "username field are required" });
     const user = await User.findOne({ username }).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
-    res.status(200).json(user);
+    return res.status(200).json(user);
   } catch (error) {
     console.log("Error in getUserProfile controller :", error.message);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 };
 
 // ..............followUnfollowUser
+
 const followUnfollowUser = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const userToModify = await User.findById(id);
-
-    const currectUser = await User.findById(req.user._id);
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "Invalid user ID" });
+    }
 
     if (id === req.user._id.toString()) {
       return res
         .status(400)
-        .json({ error: "You can't follow/unfollow your self" });
+        .json({ error: "You can't follow/unfollow yourself" });
     }
+
+    const userToModify = await User.findById(id);
+    const currectUser = await User.findById(req.user._id);
 
     if (!userToModify || !currectUser) {
       return res.status(404).json({ error: "User not found" });
     }
 
-    const isFollowing = currectUser.followers.includes(id);
+    const isFollowing = userToModify.followers.includes(
+      req.user._id.toString()
+    );
 
     if (isFollowing) {
-      // unFollow thw user
-      await User.findByIdAndUpdate(id, {
-        $pull: { followers: req.user._id },
-      });
+      // Unfollow the user
+      await Promise.all([
+        User.findByIdAndUpdate(id, {
+          $pull: { followers: req.user._id },
+        }),
+        User.findByIdAndUpdate(req.user._id, {
+          $pull: { following: id },
+        }),
+      ]);
 
-      await User.findByIdAndUpdate(req.user._id, {
-        $pull: { following: id },
-      });
-
-      res.status(200).json({ message: "User unfollow successfully" });
+      return res.status(200).json({ message: "User unfollowed successfully" });
     } else {
       // Follow the user
-      await User.findByIdAndUpdate(id, {
-        $push: { followers: req.user._id },
-      });
+      await Promise.all([
+        User.findByIdAndUpdate(id, {
+          $push: { followers: req.user._id },
+        }),
+        User.findByIdAndUpdate(req.user._id, {
+          $push: { following: id },
+        }),
+      ]);
 
-      await User.findByIdAndUpdate(req.user._id, {
-        $push: { following: id },
-      });
+      try {
+        const newNotification = new Notification({
+          type: "follow",
+          from: req.user._id,
+          to: userToModify._id,
+        });
 
-      const newNotification = new Notification({
-        type: "follow",
-        from: req.user._id,
-        to: userToModify._id,
-      });
+        await newNotification.save();
+      } catch (notificationError) {
+        console.error(
+          "Notification creation failed:",
+          notificationError.message
+        );
+      }
 
-      await newNotification.save();
-
-      res.status(200).json({ message: "User followed successfully" });
+      return res.status(200).json({ message: "User followed successfully" });
     }
   } catch (error) {
-    console.log("Error in followUnfollowUser controller : ", error.message);
-    res.status(500).json({ error: "Internal server Error" });
+    console.error("Error in followUnfollowUser controller:", error.message);
+    return res.status(500).json({ error: "Internal server error" });
   }
 };
 
@@ -104,7 +121,7 @@ const getSuggestedUsers = async (req, res) => {
 
     suggestedUsers.forEach((user) => (user.password = null));
 
-    res.status(200).json(suggestedUsers);
+    return res.status(200).json(suggestedUsers);
   } catch (error) {
     console.log("Error in getSuggestedUser controller : ", error.message);
     return res.status(500).json({ error: error.message });
@@ -192,7 +209,7 @@ const updteUser = async (req, res) => {
     return res.status(200).json(sanitizedUser);
   } catch (error) {
     console.log("Error in updateUser: ", error.message);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 };
 

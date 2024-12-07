@@ -8,10 +8,11 @@ import cors from "cors";
 dotenv.config();
 const corsConfig = {
   origin: "*",
-  Credential: true,
-  METHODS: ["GET", "POST", "PUT", "DELETE"],
+  credential: true,
+  methods: ["GET", "POST", "PUT", "DELETE"],
 };
 app.use(cors(corsConfig));
+app.options("", cors(corsConfig));
 const app = express();
 const PORT = process.env.PORT || 5001;
 // const __dirname = path.resolve();

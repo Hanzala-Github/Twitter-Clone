@@ -6,12 +6,17 @@ import connectMongoDB from "./db/db.js";
 import cors from "cors";
 
 dotenv.config();
+const corsConfig = {
+  origin: "*",
+  Credential: true,
+  METHODS: ["GET", "POST", "PUT", "DELETE"],
+};
+app.use(cors(corsConfig));
 const app = express();
 const PORT = process.env.PORT || 5001;
 // const __dirname = path.resolve();
 
 // Middleware to parse body
-app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
@@ -24,6 +29,7 @@ import authRoutes from "./routes/auth.routes.js";
 import userRouter from "./routes/user.routes.js";
 import postRouter from "./routes/post.routes.js";
 import notificationsRouter from "./routes/notifications.routes.js";
+import { METHODS } from "http";
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRouter);
